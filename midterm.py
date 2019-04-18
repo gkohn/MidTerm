@@ -28,8 +28,8 @@ from flask import request
 
 
 # Global variables to be use between funcitons
-Options_list = ('translate','identify','Top','Sentiment')
-Gib_factor = 0.1
+Options_list = ('Translate','Identify','Descriptor','Sentiment')
+Gib_factor = 0.5
 max_txt = 1000
 input_default = 'var'
 # the dictionary will contain the description fo ISO 639-1 language code
@@ -264,8 +264,8 @@ def validations(txt_input:"Text to be validated",Option:"Option to be applied"):
                 return ("NO OK","Posible Gibberish")
         elif lng_txt == 'fy':
             return ("NO OK", "Language not supperted/not possible to identify")
-        elif lng_txt != "en" and Option != "translate" and Option != "identify":
-            return ("NO OK","For other languages only options are translate/identify language")
+        elif lng_txt != "en" and Option != "Translate" and Option != "Identify":
+            return ("NO OK","For other than English the only options available are Translate/Identify language")
 
     return("OK","")
 
@@ -290,7 +290,7 @@ def print_error(Option,input_txt,type_input,page,error):
 ###
 
 # Function to identify descriptors and cuantify their appearance on the input file
-def topdescriptions(File_name:"Name of the file with the characters"):
+def Descriptors(File_name:"Name of the file with the characters"):
     tb_text = TextBlob(File_name)
     adj_list =[]
     # Once the TextBlob is created, a loop is performed over the list of words
@@ -320,6 +320,69 @@ def identify_language(txt_input:"text to identify language"):
 
     return("OK","","The language of the input is "+lng_desc)
 
+# Translate Language function
+def Translate_to_english(txt_input:"text to translate language"):
+    tb_text = TextBlob(txt_input)
+    lng_txt = tb_text.detect_language()
+    txt_output = tb_text.translate(from_lang=lng_txt,to="en")
+    
+    return("OK","",txt_output)
+
+
+# Sentiment
+def identify_sentiment(txt_input:"text to identify language",sent_level:"level to perform the sentiment"):
+
+    count_pos = 0
+    count_neg = 0
+    total_pos = 0
+    total_neg = 0
+    overall = 0
+    tb_text = TextBlob(txt_input)
+    print(tb_text.words)
+    print(tb_text.sentences)
+    if sent_level =="word":
+        for word in tb_text.words:
+            word_tb = TextBlob(str(word))
+            sentiment_value = word_tb.sentiment.polarity
+            if sentiment_value >0:
+                count_pos = count_pos + 1
+                total_pos = total_pos + sentiment_value
+            elif sentiment_value < 0:
+                count_neg = count_neg + 1
+                total_neg = total_neg + sentiment_value
+    elif sent_level == "sentence":
+        for sentence in tb_text.sentences:
+            sentence_tb = TextBlob(str(sentence))
+            sentiment_value = sentence_tb.sentiment.polarity
+            if sentiment_value >0:
+                count_pos = count_pos + 1
+                total_pos = total_pos + sentiment_value
+            elif sentiment_value < 0:
+                count_neg = count_neg + 1
+                total_neg = total_neg + sentiment_value
+    else:
+        sentiment_value = tb_text.sentiment.polarity
+        if sentiment_value >=0:
+            count_pos = count_pos + 1
+            total_pos = total_pos + sentiment_value
+        else:
+            count_neg = count_neg + 1
+            total_neg = total_neg + sentiment_value 
+    overall = total_pos + total_neg
+    if count_pos > 0:
+        ave_pos = total_pos / count_pos
+    else:
+        ave_pos = 0
+        
+    if count_neg > 0:
+        ave_neg = total_neg / count_neg
+    else:
+        ave_neg = 0
+    sentiment_d = {'Value':["Overall","Possitive","Negative"],"Sentiment Average":[overall,ave_pos,ave_neg],"Total Elements":[1,count_pos,count_neg]}
+    print(sentiment_d)
+    df_sentiment = pd.DataFrame(data=sentiment_d)
+    return("OK","",df_sentiment)
+
 # definition of the REST API
 app = Flask(__name__)
 
@@ -341,13 +404,13 @@ def main_process():
     global input_default
     address_default = 'https://sit.instructure.com/files/4653201/download?download_frd=1&verifier=aWl6ZvPwzQ6wPLZ8H6yTh7O1lJ4Dq9ryBWReSW3M'
     txt_default = ''
-    Option_default = "Top"
+    Option_default = "Descriptor"
 
     page = request.args.get('url', default= address_default,type=str)
     type_input = request.args.get('type', default =input_default , type=str)
     input_txt = request.args.get('text', default =txt_default , type=str)
     Option = request.args.get('feature', default=Option_default, type=str)
-    
+    sent_level = request.args.get('level', default="", type=str)
 
     if type == 'url':
         input_txt = getfile(page)
@@ -358,16 +421,22 @@ def main_process():
         print_error(Option,input_txt,type_input,page,error)
         return error
 
-    if Option == "Top":
-        result,error,desciption_result = topdescriptions(input_txt)
+    if Option == "Descriptor":
+        result,error,desciption_result = Descriptors(input_txt)
         result_return = desciption_result.to_json(orient='split')
-    elif Option == "identify":
+    elif Option == "Identify":
         result,error,result_return = identify_language(input_txt)
+    elif Option == "Sentiment":
+        result,error,sentiment_result = identify_sentiment(input_txt,sent_level)
+        result_return = sentiment_result.to_json(orient='split')
+    elif Option == "Translate":
+        result,error,translate_result = Translate_to_english(input_txt)
+        result_return = str(translate_result)
     else:
         return("Nothing to show")
     if result =="OK":
         print("result", result_return)
-        return ("OK", result_return)
+        return (result_return)
     else:
         return ("NO OK",error)
 
@@ -376,9 +445,9 @@ def main_process():
 #### Descriptors End Point
 ##################################################################################
     
-@app.route('/top', methods=['GET'])
+@app.route('/descriptor', methods=['GET'])
 
-def Top_process():
+def Descriptors_process():
     
     global input_default
     
@@ -395,18 +464,19 @@ def Top_process():
         print_error(Option,input_txt,type_input,page,error)
         return error
 
-    result,error,desciption_result = topdescriptions(input_txt)
+    result,error,desciption_result = Descriptors(input_txt)
     result_return = desciption_result.to_json(orient='split')
     if result =="OK":
         return ("OK", result_return)
     else:
         return ("NO OK",error)
 
+
 ##################################################################################
 #### Identify End Point
 ##################################################################################
     
-@app.route('/top', methods=['GET'])
+@app.route('/Identify', methods=['GET'])
 
 def Identify_process():
     
@@ -434,6 +504,66 @@ def Identify_process():
 
 
 
+##################################################################################
+#### Translate End Point
+##################################################################################
+    
+@app.route('/Translate', methods=['GET'])
+
+def Translate_process():
+    
+    global input_default
+    
+    page = request.args.get('url', default= "",type=str)
+    type_input = request.args.get('type', default =input_default , type=str)
+    input_txt = request.args.get('text', default ="" , type=str)
+    
+    if type == 'url':
+        input_txt = getfile(page)
+        
+    result,error = validations(input_txt,Option)
+
+    if result != "OK":
+        print_error(Option,input_txt,type_input,page,error)
+        return error
+
+    result,error,result_return = Translate_to_english(input_txt)
+    
+    if result =="OK":
+        return ("OK", result_return)
+    else:
+        return ("NO OK",error)
+
+##################################################################################
+#### Sentiment End Point
+##################################################################################
+    
+@app.route('/Sentiment', methods=['GET'])
+
+def Sentiment_process():
+
+    global input_default
+    
+    page = request.args.get('url', default= "",type=str)
+    type_input = request.args.get('type', default =input_default , type=str)
+    input_txt = request.args.get('text', default ="" , type=str)
+    sent_level = request.args.get('level', default="", type=str)
+    
+    if type == 'url':
+        input_txt = getfile(page)
+        
+    result,error = validations(input_txt,Option)
+
+    if result != "OK":
+        print_error(Option,input_txt,type_input,page,error)
+        return error
+
+    result,error,result_return = indentify_sentiment(input_txt,sent_level)
+    
+    if result =="OK":
+        return ("OK", result_return)
+    else:
+        return ("NO OK",error)
 
 
 
