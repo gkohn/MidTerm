@@ -12,6 +12,7 @@ from textblob.classifiers import NaiveBayesClassifier
 from textblob.taggers import NLTKTagger
 from textblob.wordnet import VERB
 
+from flask_restplus import Resource, Api, fields
 
 #Pandas for operate with Dataframes
 import pandas as pd
@@ -618,6 +619,140 @@ def Sentiment_process():
         return make_response(result_return, 200)
     else:
         return make_response(jsonify({"error": error}), 400)
+
+
+##
+#  GET request for the user instructions and POST requests to submit data,
+##
+
+api = Api(app = app ,
+		  version = "1.0",
+		  title = "NLP Processor",
+		  description = "NLP Data Service provides severa Natural Languauge Processing services")
+###
+
+
+model = api.model('Name Model',
+				  {'input': fields.String(required = True,
+    					  				 description="Name of the person",
+    					  				 help="Name cannot be blank.")})
+
+####
+## Parts of speech End points for get and post
+####
+pos_space = api.namespace('PartsOfSpeech', description='Pass a string to reconnize the parts of speech')
+
+@pos_space.route("/pos")
+class PartsOfSpeech(Resource):
+
+	@api.doc(responses={ 200: 'OK', 400: 'Invalid Argument', 500: 'Mapping Key Error' },
+			 params={})
+	def get(self):
+		try:
+			return {
+				"instructions": "The sample call to the POST method will take in as input a JSON with an element called input",
+			}
+		except KeyError as e:
+			pos_space.abort(500, e.__doc__, status = "Could not retrieve information", statusCode = "500")
+		except Exception as e:
+			pos_space.abort(400, e.__doc__, status = "Could not retrieve information", statusCode = "400")
+
+	@api.doc(responses={ 200: 'OK', 400: 'Invalid Argument', 500: 'Mapping Key Error' },
+			 params={ 'input': 'Specify the input string that needs to be processed' })
+	@api.expect(model)
+	def post(self):
+            try:
+                inputData=request.json['input']
+                wiki = TextBlob(inputData)
+                return {
+                    "pos" : wiki.tags
+                }
+
+            except KeyError as e:
+                pos_space.abort(500, e.__doc__, status = "Could not save information", statusCode = "500")
+            except Exception as e:
+                pos_space.abort(400, e.__doc__, status = "Could not save information", statusCode = "400")
+
+
+
+####
+## Subjectivity End points for get and post
+####
+sub_space = api.namespace('Subjectivity', description='Pass a string to reconnize the subjectivity or objectivity of the text')
+
+@sub_space.route("/sub")
+class Subjectivity(Resource):
+
+	@api.doc(responses={ 200: 'OK', 400: 'Invalid Argument', 500: 'Mapping Key Error' },
+			 params={})
+	def get(self):
+		try:
+			return {
+				"instructions": "The sample call to the POST method will take in as input a JSON with an element called input",
+			}
+		except KeyError as e:
+			sub_space.abort(500, e.__doc__, status = "Could not retrieve information", statusCode = "500")
+		except Exception as e:
+			sub_space.abort(400, e.__doc__, status = "Could not retrieve information", statusCode = "400")
+
+	@api.doc(responses={ 200: 'OK', 400: 'Invalid Argument', 500: 'Mapping Key Error' },
+			 params={ 'input': 'Specify the input string that needs to be processed' })
+	@api.expect(model)
+	def post(self):
+            try:
+                inputData=request.json['input']
+                wiki = TextBlob(inputData)
+                return {
+                    "subjectivityScore": wiki.subjectivity,
+                }
+
+            except KeyError as e:
+                sub_space.abort(500, e.__doc__, status = "Could not save information", statusCode = "500")
+            except Exception as e:
+                sub_space.abort(400, e.__doc__, status = "Could not save information", statusCode = "400")
+
+
+
+####
+## Lemmatization  End points for get and post
+####
+lem_space = api.namespace('Lemmatize', description='Pass a string and its words will be lemmatized')
+
+@lem_space.route("/lemmatize")
+class Lemmatize(Resource):
+
+	@api.doc(responses={ 200: 'OK', 400: 'Invalid Argument', 500: 'Mapping Key Error' },
+			 params={})
+	def get(self):
+		try:
+			return {
+				"instructions": "The sample call to the POST method will take in as input a JSON with an element called input",
+			}
+		except KeyError as e:
+			lem_space.abort(500, e.__doc__, status = "Could not retrieve information", statusCode = "500")
+		except Exception as e:
+			lem_space.abort(400, e.__doc__, status = "Could not retrieve information", statusCode = "400")
+
+	@api.doc(responses={ 200: 'OK', 400: 'Invalid Argument', 500: 'Mapping Key Error' },
+			 params={ 'input': 'Specify the input string that needs to be processed' })
+	@api.expect(model)
+	def post(self):
+            try:
+                inputData=request.json['input']
+                wiki = TextBlob(inputData)
+                print(wiki.words)
+                lemmatized_sentence = "LEMMATIZED ="
+                for word  in wiki.words:
+                    lemmatized_sentence =  lemmatized_sentence+" "+str(word.lemmatize())
+                    print(lemmatized_sentence )
+                return {
+                    "lemmatized_word" : lemmatized_sentence
+                }
+
+            except KeyError as e:
+                lem_space.abort(500, e.__doc__, status = "Could not save information", statusCode = "500")
+            except Exception as e:
+                lem_space.abort(400, e.__doc__, status = "Could not save information", statusCode = "400")
 
 
 
