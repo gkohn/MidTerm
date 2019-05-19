@@ -12,6 +12,7 @@ from textblob.classifiers import NaiveBayesClassifier
 from textblob.taggers import NLTKTagger
 from textblob.wordnet import VERB
 
+from flask_restplus import Resource, Api, fields
 
 #Pandas for operate with Dataframes
 import pandas as pd
@@ -27,7 +28,7 @@ from flask import request
 from flask import make_response
 
 
-# Global variables to be use between funcitons
+# Global variables to be use between functions
 # and system parameters
 Options_list = ('Translate','Identify','Descriptor','Sentiment')
 sent_level_list = ('word','sentece','whole')
@@ -40,6 +41,25 @@ Gib_factor = 0.5
 max_txt = 1000000
 # max size in bytes allowed
 max_file_size = 1000000 
+
+# Stopwords
+stopwords = ['a','about', 'after', 'again', 'all', 'almost', 'also', 'although', 'always', 'among', 'an', 'and', 'another', 
+'any', 'anybody', 'anyone', 'anything', 'anywhere', 'are', 'around', 'as', 'at', 'back', 'be', 'became', 'because', 
+'become', 'becomes', 'been', 'before', 'being', 'better', 'between', 'both', 'but', 'by', 'can', 'cannot', 'certain', 
+'certainly', 'clearly', 'could', 'did', 'different', 'differently', 'do', 'does', 'done', 'down', 'during', 'each', 
+'either', 'enough', 'even', 'ever', 'every', 'everyone', 'everything', 'everywhere', 'fact', 'facts', 'far', 'felt', 
+'few', 'first', 'for', 'from', 'full', 'fully', 'further', 'gave', 'generally', 'get', 'gets', 'give', 'go', 'good', 
+'got', 'great', 'had', 'has', 'have', 'having', 'he', 'her', 'here', 'herself', 'him', 'himself', 'his', 'how', 'however', 
+'if', 'in', 'into', 'is', 'it', 'its', 'itself', 'just', 'last', 'later', 'latest', 'least', 'less', 'let', 'like', 'made',
+ 'make', 'man', 'many', 'may', 'me', 'might', 'more', 'most', 'much', 'must', 'my', 'myself', 'necessary', 'need', 'never',
+ 'no', 'nobody', 'not', 'nothing', 'now', 'nowhere', 'number', 'of', 'off', 'often', 'on', 'once', 'one', 'only', 'or', 
+ 'other', 'others', 'our', 'out', 'over', 'per', 'perhaps', 'possible', 'put', 'quite', 'rather', 'really', 'said', 
+ 'same', 'saw', 'say', 'see', 'seem', 'several', 'shall', 'she', 'should', 'since', 'so', 'some', 'somebody', 'someone', 
+ 'something', 'somewhere', 'still', 'such', 'sure', 'than', 'that', 'the', 'their', 'them', 'then', 'there', 'therefore', 
+ 'these', 'they', 'thing', 'things', 'think', 'thinks', 'this', 'through', 'thus', 'to', 'today', 'together', 'too', 
+ 'took', 'toward', 'under', 'until', 'up', 'upon', 'us', 'use', 'very', 'was', 'way', 'ways', 'we', 'well', 'went', 
+ 'were', 'what', 'when', 'where', 'whether', 'which', 'while', 'who', 'whole', 'whose', 'why', 'will', 'with', 'within', 
+ 'whether', 'work', 'works', 'would', 'yet', 'you', 'your', 'yours']
 
 
 # the dictionary will contain the description fo ISO 639-1 language code
@@ -326,16 +346,16 @@ def print_error(Option,input_txt,type_input,page,error):
 ### FEATURES to provide capabilities on the APIs
 ###
 
-# Function to identify descriptors and cuantify their appearance on the input file
+# Function to identify descriptors and quantify their appearance on the input file
 def Descriptors(File_name:"Name of the file with the characters"):
     tb_text = TextBlob(File_name)
     adj_list =[]
     # Once the TextBlob is created, a loop is performed over the list of words
-    # to identify the descriptors (PoS like JJ are adjetives)
+    # to identify the descriptors (PoS like JJ are adjectives)
     for word,pos in tb_text.tags:
         if pos[0:2] =="JJ":
             adj_list.append(word)
-    # Creating a Dataframe indicating how many times the adjetive is on the list
+    # Creating a Dataframe indicating how many times the adjective is on the list
     adj_list_df = pd.DataFrame({'Descriptor':adj_list})
     count_desc = adj_list_df['Descriptor'].value_counts(sort=False).sort_values(ascending=False)
     count_df = count_desc.rename_axis('Descriptor').reset_index(name='Occurences')
@@ -421,6 +441,33 @@ def identify_sentiment(txt_input:"text to identify language",sent_level:"level t
     print(sentiment_d)
     df_sentiment = pd.DataFrame(data=sentiment_d)
     return("OK","",df_sentiment)
+
+# Main Topic
+def main_topic(txt_input:"text to identify main topic"): 
+    # Convert to Blob
+    tb_text = TextBlob(txt_input)
+    
+    # Lemmatize
+    out = " ". join([w.lemmatize() for w in tb_text.words])
+    
+    # Tokenize into words
+    word_tokens = TextBlob(out).words    
+    
+    # Remove stop words
+    lista = [word for word in word_tokens if word not in stopwords]
+    tekst = ' '.join(lista)
+    blob = TextBlob(tekst)
+    
+    # N-Grams
+    blob_n = blob.ngrams(3)
+    n_list = []
+    for l in blob_n:
+        n_list.append(str(l))
+    n_count = pd.DataFrame({'NGram':n_list})    
+    count_n = n_count['NGram'].value_counts(sort=False).sort_values(ascending=False)
+    
+    return("OK","","The main topic is "+ str(count_n.index[0]))
+
 
 # definition of the REST API
 app = Flask(__name__)
@@ -618,6 +665,175 @@ def Sentiment_process():
         return make_response(result_return, 200)
     else:
         return make_response(jsonify({"error": error}), 400)
+
+##################################################################################
+#### Main Topic End Point
+##################################################################################
+    
+@app.route('/midterm/MainTopic', methods=['GET'])
+
+def Main_process():
+    
+ 
+    page = request.args.get('url', default= "",type=str)
+    type_input = request.args.get('type', default ="" , type=str)
+    input_txt = request.args.get('text', default ="" , type=str)
+    Option = "MainToipc"
+
+    if type_input == 'url':
+        result,error, input_txt = getfile(page)
+        if result != "OK":
+            print_error(Option,input_txt,type_input,page,error)
+            return make_response(jsonify({"error":error}), 400)
+        
+    result,error = validations(input_txt,Option)
+
+    if result != "OK":
+        print_error(Option,input_txt,type_input,page,error)
+        return make_response(jsonify({"error":error}), 400)
+
+    result,error,main_topic_result = main_topic(input_txt)
+
+    result_return = main_topic_result.to_json(orient='split')
+
+    if result =="OK":
+        return make_response(result_return, 200)
+    else:
+        return make_response(jsonify({"error":error}), 400)
+
+
+##
+#  GET request for the user instructions and POST requests to submit data,
+##
+
+api = Api(app = app ,
+		  version = "1.0",
+		  title = "NLP Processor",
+		  description = "NLP Data Service provides severa Natural Languauge Processing services")
+###
+
+
+model = api.model('Name Model',
+				  {'input': fields.String(required = True,
+    					  				 description="Name of the person",
+    					  				 help="Name cannot be blank.")})
+
+####
+## Parts of speech End points for get and post
+####
+pos_space = api.namespace('PartsOfSpeech', description='Pass a string to recognize the parts of speech')
+
+@pos_space.route("/pos")
+class PartsOfSpeech(Resource):
+
+	@api.doc(responses={ 200: 'OK', 400: 'Invalid Argument', 500: 'Mapping Key Error' },
+			 params={})
+	def get(self):
+		try:
+			return {
+				"instructions": "The sample call to the POST method will take in as input a JSON with an element called input",
+			}
+		except KeyError as e:
+			pos_space.abort(500, e.__doc__, status = "Could not retrieve information", statusCode = "500")
+		except Exception as e:
+			pos_space.abort(400, e.__doc__, status = "Could not retrieve information", statusCode = "400")
+
+	@api.doc(responses={ 200: 'OK', 400: 'Invalid Argument', 500: 'Mapping Key Error' },
+			 params={ 'input': 'Specify the input string that needs to be processed' })
+	@api.expect(model)
+	def post(self):
+            try:
+                inputData=request.json['input']
+                wiki = TextBlob(inputData)
+                return {
+                    "pos" : wiki.tags
+                }
+
+            except KeyError as e:
+                pos_space.abort(500, e.__doc__, status = "Could not save information", statusCode = "500")
+            except Exception as e:
+                pos_space.abort(400, e.__doc__, status = "Could not save information", statusCode = "400")
+
+
+
+####
+## Subjectivity End points for get and post
+####
+sub_space = api.namespace('Subjectivity', description='Pass a string to reconnize the subjectivity or objectivity of the text')
+
+@sub_space.route("/sub")
+class Subjectivity(Resource):
+
+	@api.doc(responses={ 200: 'OK', 400: 'Invalid Argument', 500: 'Mapping Key Error' },
+			 params={})
+	def get(self):
+		try:
+			return {
+				"instructions": "The sample call to the POST method will take in as input a JSON with an element called input",
+			}
+		except KeyError as e:
+			sub_space.abort(500, e.__doc__, status = "Could not retrieve information", statusCode = "500")
+		except Exception as e:
+			sub_space.abort(400, e.__doc__, status = "Could not retrieve information", statusCode = "400")
+
+	@api.doc(responses={ 200: 'OK', 400: 'Invalid Argument', 500: 'Mapping Key Error' },
+			 params={ 'input': 'Specify the input string that needs to be processed' })
+	@api.expect(model)
+	def post(self):
+            try:
+                inputData=request.json['input']
+                wiki = TextBlob(inputData)
+                return {
+                    "subjectivityScore": wiki.subjectivity,
+                }
+
+            except KeyError as e:
+                sub_space.abort(500, e.__doc__, status = "Could not save information", statusCode = "500")
+            except Exception as e:
+                sub_space.abort(400, e.__doc__, status = "Could not save information", statusCode = "400")
+
+
+
+####
+## Lemmatization  End points for get and post
+####
+lem_space = api.namespace('Lemmatize', description='Pass a string and its words will be lemmatized')
+
+@lem_space.route("/lemmatize")
+class Lemmatize(Resource):
+
+	@api.doc(responses={ 200: 'OK', 400: 'Invalid Argument', 500: 'Mapping Key Error' },
+			 params={})
+	def get(self):
+		try:
+			return {
+				"instructions": "The sample call to the POST method will take in as input a JSON with an element called input",
+			}
+		except KeyError as e:
+			lem_space.abort(500, e.__doc__, status = "Could not retrieve information", statusCode = "500")
+		except Exception as e:
+			lem_space.abort(400, e.__doc__, status = "Could not retrieve information", statusCode = "400")
+
+	@api.doc(responses={ 200: 'OK', 400: 'Invalid Argument', 500: 'Mapping Key Error' },
+			 params={ 'input': 'Specify the input string that needs to be processed' })
+	@api.expect(model)
+	def post(self):
+            try:
+                inputData=request.json['input']
+                wiki = TextBlob(inputData)
+                print(wiki.words)
+                lemmatized_sentence = "LEMMATIZED ="
+                for word  in wiki.words:
+                    lemmatized_sentence =  lemmatized_sentence+" "+str(word.lemmatize())
+                    print(lemmatized_sentence )
+                return {
+                    "lemmatized_word" : lemmatized_sentence
+                }
+
+            except KeyError as e:
+                lem_space.abort(500, e.__doc__, status = "Could not save information", statusCode = "500")
+            except Exception as e:
+                lem_space.abort(400, e.__doc__, status = "Could not save information", statusCode = "400")
 
 
 
