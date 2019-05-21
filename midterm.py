@@ -346,12 +346,13 @@ def print_error(Option,input_txt,type_input,page,error):
 ### FEATURES to provide capabilities on the APIs
 ###
 
+
 # Check Spelling
 def spell_check(txt_input:"text to spellcheck"):
     tb_text = TextBlob(txt_input)
     tb_update = tb_text.correct()
     return("OK","",tb_update)
-
+  
 # Function to identify descriptors and quantify their appearance on the input file
 def Descriptors(File_name:"Name of the file with the characters"):
     tb_text = TextBlob(File_name)
@@ -465,6 +466,7 @@ def main_topic(txt_input:"text to identify main topic"):
     blob = TextBlob(tekst)
     
     # N-Grams
+
     if len(lista)<3:
         return("OK","","The main topic is "+ str(blob))
     else:
@@ -475,6 +477,7 @@ def main_topic(txt_input:"text to identify main topic"):
             n_count = pd.DataFrame({'NGram':n_list})    
             count_n = n_count['NGram'].value_counts(sort=False).sort_values(ascending=False)
             return("OK","","The main topic is "+ str(count_n.index[0]))
+
 
 
 # definition of the REST API
@@ -782,6 +785,141 @@ model = api.model('Name Model',
 ## Parts of speech End points for get and post
 ####
 pos_space = api.namespace('PartsOfSpeech', description='Pass a string to recognize the parts of speech')
+
+@pos_space.route("/pos")
+class PartsOfSpeech(Resource):
+
+	@api.doc(responses={ 200: 'OK', 400: 'Invalid Argument', 500: 'Mapping Key Error' },
+			 params={})
+	def get(self):
+		try:
+			return {
+				"instructions": "The sample call to the POST method will take in as input a JSON with an element called input",
+			}
+		except KeyError as e:
+			pos_space.abort(500, e.__doc__, status = "Could not retrieve information", statusCode = "500")
+		except Exception as e:
+			pos_space.abort(400, e.__doc__, status = "Could not retrieve information", statusCode = "400")
+
+	@api.doc(responses={ 200: 'OK', 400: 'Invalid Argument', 500: 'Mapping Key Error' },
+			 params={ 'input': 'Specify the input string that needs to be processed' })
+	@api.expect(model)
+	def post(self):
+            try:
+                inputData=request.json['input']
+                wiki = TextBlob(inputData)
+                return {
+                    "pos" : wiki.tags
+                }
+
+            except KeyError as e:
+                pos_space.abort(500, e.__doc__, status = "Could not save information", statusCode = "500")
+            except Exception as e:
+                pos_space.abort(400, e.__doc__, status = "Could not save information", statusCode = "400")
+
+
+
+####
+## Subjectivity End points for get and post
+####
+sub_space = api.namespace('Subjectivity', description='Pass a string to reconnize the subjectivity or objectivity of the text')
+
+@sub_space.route("/sub")
+class Subjectivity(Resource):
+
+	@api.doc(responses={ 200: 'OK', 400: 'Invalid Argument', 500: 'Mapping Key Error' },
+			 params={})
+	def get(self):
+		try:
+			return {
+				"instructions": "The sample call to the POST method will take in as input a JSON with an element called input",
+			}
+		except KeyError as e:
+			sub_space.abort(500, e.__doc__, status = "Could not retrieve information", statusCode = "500")
+		except Exception as e:
+			sub_space.abort(400, e.__doc__, status = "Could not retrieve information", statusCode = "400")
+
+	@api.doc(responses={ 200: 'OK', 400: 'Invalid Argument', 500: 'Mapping Key Error' },
+			 params={ 'input': 'Specify the input string that needs to be processed' })
+	@api.expect(model)
+	def post(self):
+            try:
+                inputData=request.json['input']
+                wiki = TextBlob(inputData)
+                return {
+                    "subjectivityScore": wiki.subjectivity,
+                }
+
+            except KeyError as e:
+                sub_space.abort(500, e.__doc__, status = "Could not save information", statusCode = "500")
+            except Exception as e:
+                sub_space.abort(400, e.__doc__, status = "Could not save information", statusCode = "400")
+
+
+
+####
+## Lemmatization  End points for get and post
+####
+lem_space = api.namespace('Lemmatize', description='Pass a string and its words will be lemmatized')
+
+@lem_space.route("/lemmatize")
+class Lemmatize(Resource):
+
+	@api.doc(responses={ 200: 'OK', 400: 'Invalid Argument', 500: 'Mapping Key Error' },
+			 params={})
+	def get(self):
+		try:
+			return {
+				"instructions": "The sample call to the POST method will take in as input a JSON with an element called input",
+			}
+		except KeyError as e:
+			lem_space.abort(500, e.__doc__, status = "Could not retrieve information", statusCode = "500")
+		except Exception as e:
+			lem_space.abort(400, e.__doc__, status = "Could not retrieve information", statusCode = "400")
+
+	@api.doc(responses={ 200: 'OK', 400: 'Invalid Argument', 500: 'Mapping Key Error' },
+			 params={ 'input': 'Specify the input string that needs to be processed' })
+	@api.expect(model)
+	def post(self):
+            try:
+                inputData=request.json['input']
+                wiki = TextBlob(inputData)
+                print(wiki.words)
+                lemmatized_sentence = "LEMMATIZED ="
+                for word  in wiki.words:
+                    lemmatized_sentence =  lemmatized_sentence+" "+str(word.lemmatize())
+                    print(lemmatized_sentence )
+                return {
+                    "lemmatized_word" : lemmatized_sentence
+                }
+
+            except KeyError as e:
+                lem_space.abort(500, e.__doc__, status = "Could not save information", statusCode = "500")
+            except Exception as e:
+                lem_space.abort(400, e.__doc__, status = "Could not save information", statusCode = "400")
+
+
+
+##
+#  GET request for the user instructions and POST requests to submit data,
+##
+
+api = Api(app = app ,
+		  version = "1.0",
+		  title = "NLP Processor",
+		  description = "NLP Data Service provides severa Natural Languauge Processing services")
+###
+
+
+model = api.model('Name Model',
+				  {'input': fields.String(required = True,
+    					  				 description="Name of the person",
+    					  				 help="Name cannot be blank.")})
+
+####
+## Parts of speech End points for get and post
+####
+pos_space = api.namespace('PartsOfSpeech', description='Pass a string to reconnize the parts of speech')
 
 @pos_space.route("/pos")
 class PartsOfSpeech(Resource):
